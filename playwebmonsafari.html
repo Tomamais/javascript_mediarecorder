@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio File Uploader and Player</title>
+</head>
+<body>
+    <h1>Audio File Uploader and Player</h1>
+
+    <!-- Input field for uploading audio file -->
+    <input type="file" accept=".webm, .mp3, .wav" id="audioInput">
+    
+    <!-- Button to trigger audio playback -->
+    <button id="playButton" disabled>Play Audio</button>
+    
+    <!-- Audio player for playing the uploaded file -->
+    <audio controls id="audioPlayer">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        // Get references to the input field, play button, and audio player
+        const audioInput = document.getElementById('audioInput');
+        const playButton = document.getElementById('playButton');
+        const audioPlayer = document.getElementById('audioPlayer');
+        let audioContext = null;
+        let audioSource = null;
+
+        // Add an event listener to the input field
+        audioInput.addEventListener('change', function() {
+            // Get the selected file
+            const selectedFile = audioInput.files[0];
+
+            // Check if a file was selected
+            if (selectedFile) {
+                // Enable the play button
+                playButton.disabled = false;
+            } else {
+                // Disable the play button if no file is selected
+                playButton.disabled = true;
+            }
+        });
+
+        // Add an event listener to the play button
+        playButton.addEventListener('click', function() {
+            // Check if audioContext is already initialized
+            if (!audioContext) {
+                // Initialize the audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioSource = audioContext.createBufferSource();
+                audioSource.connect(audioContext.destination);
+            }
+
+            // Get the selected file
+            const selectedFile = audioInput.files[0];
+
+            // Read and decode the selected audio file
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                audioContext.decodeAudioData(arrayBuffer, function(buffer) {
+                    // Set the buffer as the audio source and play it
+                    audioSource.buffer = buffer;
+                    audioSource.start(0);
+                    audioPlayer.src = URL.createObjectURL(selectedFile);
+                    audioPlayer.play();
+                }).catch(function(error) {
+                    console.error("Error decoding audio data:", error);
+                });
+            };
+            reader.readAsArrayBuffer(selectedFile);
+        });
+    </script>
+</body>
+</html>

@@ -3,33 +3,113 @@
   <head>
     <meta charset="UTF-8">
     <title>Audio Recorder and Player</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      h1 {
+        text-align: center;
+        margin-top: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      #audio-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .audio-item {
+        text-align: center;
+        border: 1px solid #ccc;
+        background-color: #f5f5f5;
+        padding: 10px;
+        box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.3);
+      }
+      .audio-item audio {
+        width: 100%;
+        margin-top: 10px;
+      }
+      .audio-metadata {
+        margin-top: 10px;
+        font-size: 14px;
+      }
+    </style>
   </head>
   <body>
-    <h1>Audio Recorder and Player</h1>
-    <button id="start-btn">Start Recording</button>
-    <button id="stop-btn" disabled>Stop Recording</button>
-    <button id="play-btn" disabled>Play Recording</button>
-    <button id="download-btn" disabled>Download Recording</button>
-    <audio id="audio-player" controls></audio>
-    <select id="file-type">
-      <option value="audio/webm">WebM</option>
-      <option value="audio/mpeg">MP3</option>
-      <option value="audio/wav">WAV</option>
-      <option value="audio/ogg">OGG</option>
-    </select>
-    <span id="countdown"></span>
+    <div class="container">
+      <h1>Audio Recorder and Player</h1>
+      <button id="start-btn">Start Recording</button>
+      <button id="stop-btn" disabled>Stop Recording</button>
+      <button id="play-btn" disabled>Play Recording</button>
+      <button id="upload-btn" disabled>Upload Recording</button>
+      <button id="download-btn" disabled>Download Recording</button>
+      <input type="file" id="file-upload" accept="audio/*" style="display: none;">
+      <audio id="audio-player" controls></audio>
+      <select id="file-type">
+        <!-- Supported formats will be added dynamically via JavaScript -->
+      </select>
+      <span id="countdown"></span>
+      <div id="audio-list"></div>
+      <div id="error-log"></div> <!-- Error log section -->
+    </div>
     <script>
       const startBtn = document.getElementById('start-btn');
       const stopBtn = document.getElementById('stop-btn');
       const playBtn = document.getElementById('play-btn');
+      const uploadBtn = document.getElementById('upload-btn');
       const downloadBtn = document.getElementById('download-btn');
       const audioPlayer = document.getElementById('audio-player');
       const fileTypeSelect = document.getElementById('file-type');
       const countdown = document.getElementById('countdown');
+      const fileUpload = document.getElementById('file-upload');
+      const audioList = document.getElementById('audio-list');
+      const errorLog = document.getElementById('error-log'); // Error log section
       let chunks = [];
       let mediaRecorder = null;
       let countdownInterval = null;
       let countdownSeconds = 10;
+
+      // Function to log error messages to the error log section
+      function logError(message) {
+        errorLog.style.display = 'block';
+        errorLog.textContent += `${message}\n`;
+      }
+
+      // Check if a MIME type is supported by the browser
+      function isMimeTypeSupported(mimeType) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          return true;
+        } else {
+          logError(`MIME type ${mimeType} is not supported by your browser.`);
+          return false;
+        }
+      }
+
+      // Update the file type dropdown with supported formats
+      function updateFileTypeDropdown() {
+        const supportedFormats = [
+          { label: 'WebM', mimeType: 'audio/webm' },
+          { label: 'MP3', mimeType: 'audio/mpeg' },
+          { label: 'WAV', mimeType: 'audio/wav' },
+          { label: 'OGG', mimeType: 'audio/ogg' },
+          { label: 'MP4', mimeType: 'audio/mp4' },
+        ];
+
+        supportedFormats.forEach(format => {
+          if (isMimeTypeSupported(format.mimeType)) {
+            const option = document.createElement('option');
+            option.value = format.mimeType;
+            option.textContent = format.label;
+            fileTypeSelect.appendChild(option);
+          }
+        });
+      }
 
       // Start recording audio
       startBtn.addEventListener('click', () => {
@@ -37,13 +117,15 @@
         chunks = [];
         navigator.mediaDevices.getUserMedia({ audio: true })
           .then(stream => {
-            mediaRecorder = new MediaRecorder(stream, { mimeType: fileTypeSelect.value});
+            mediaRecorder = new MediaRecorder(stream, { mimeType: fileTypeSelect.value });
             mediaRecorder.start();
             console.log("Recording started");
             startBtn.disabled = true;
             stopBtn.disabled = false;
             playBtn.disabled = true;
+            uploadBtn.disabled = true;
             downloadBtn.disabled = true;
+            fileUpload.disabled = true;
             chunks = [];
             mediaRecorder.addEventListener("dataavailable", event => {
               chunks.push(event.data);
@@ -55,7 +137,13 @@
               startBtn.disabled = false;
               stopBtn.disabled = true;
               playBtn.disabled = false;
+              uploadBtn.disabled = false;
               downloadBtn.disabled = false;
+              fileUpload.disabled = false;
+
+              // Add the recorded audio to the list with metadata
+              const timestamp = new Date().toLocaleString();
+              addAudioToList(audioBlob, fileTypeSelect.value, timestamp);
             });
             countdownInterval = setInterval(() => {
               countdownSeconds--;
@@ -81,8 +169,25 @@
 
       // Play recorded audio
       playBtn.addEventListener('click', () => {
-        console.log(chunks);
         audioPlayer.play();
+      });
+
+      // Upload recorded audio
+      uploadBtn.addEventListener('click', () => {
+        fileUpload.click();
+      });
+
+      // Handle file upload
+      fileUpload.addEventListener('change', () => {
+        const uploadedFile = fileUpload.files[0];
+        if (uploadedFile) {
+          const audioBlob = new Blob([uploadedFile], { type: uploadedFile.type });
+          audioPlayer.src = URL.createObjectURL(audioBlob);
+
+          // Add the uploaded audio to the list with metadata
+          const timestamp = new Date().toLocaleString();
+          addAudioToList(audioBlob, uploadedFile.type, timestamp);
+        }
       });
 
       // Download recorded audio
@@ -97,6 +202,31 @@
         a.click();
         window.URL.revokeObjectURL(url);
       });
+
+      // Function to add audio to the list with metadata
+      function addAudioToList(audioBlob, format, timestamp) {
+        const audioItem = document.createElement('div');
+        audioItem.classList.add('audio-item');
+
+        const audioElement = document.createElement('audio');
+        audioElement.controls = true;
+        audioElement.src = URL.createObjectURL(audioBlob);
+
+        const formatElement = document.createElement('p');
+        formatElement.classList.add('audio-metadata');
+        formatElement.textContent = `Format: ${format}`;
+
+        const timestampElement = document.createElement('p');
+        timestampElement.classList.add('audio-metadata');
+        timestampElement.textContent = `Timestamp: ${timestamp}`;
+
+        audioItem.appendChild(audioElement);
+        audioItem.appendChild(formatElement);
+        audioItem.appendChild(timestampElement);
+        audioList.appendChild(audioItem);
+      }
+
+      updateFileTypeDropdown();
     </script>
   </body>
 </html>
