@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Audio Recorder and Player</title>
+  </head>
+  <body>
+    <h1>Audio Recorder and Player</h1>
+    <button id="start-btn">Start Recording</button>
+    <button id="stop-btn" disabled>Stop Recording</button>
+    <button id="play-btn" disabled>Play Recording</button>
+    <button id="download-btn" disabled>Download Recording</button>
+    <audio id="audio-player" controls></audio>
+    <select id="file-type">
+      <option value="audio/webm">WebM</option>
+      <option value="audio/mpeg">MP3</option>
+      <option value="audio/wav">WAV</option>
+      <option value="audio/ogg">OGG</option>
+    </select>
+    <span id="countdown"></span>
+    <script>
+      const startBtn = document.getElementById('start-btn');
+      const stopBtn = document.getElementById('stop-btn');
+      const playBtn = document.getElementById('play-btn');
+      const downloadBtn = document.getElementById('download-btn');
+      const audioPlayer = document.getElementById('audio-player');
+      const fileTypeSelect = document.getElementById('file-type');
+      const countdown = document.getElementById('countdown');
+      let chunks = [];
+      let mediaRecorder = null;
+      let countdownInterval = null;
+      let countdownSeconds = 10;
+
+      // Start recording audio
+      startBtn.addEventListener('click', () => {
+        // resets it
+        chunks = [];
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(stream => {
+            mediaRecorder = new MediaRecorder(stream, { mimeType: fileTypeSelect.value});
+            mediaRecorder.start();
+            console.log("Recording started");
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            playBtn.disabled = true;
+            downloadBtn.disabled = true;
+            chunks = [];
+            mediaRecorder.addEventListener("dataavailable", event => {
+              chunks.push(event.data);
+            });
+            mediaRecorder.addEventListener("stop", () => {
+              const audioBlob = new Blob(chunks, { type: fileTypeSelect.value });
+              audioPlayer.src = URL.createObjectURL(audioBlob);
+              console.log("Recording stopped");
+              startBtn.disabled = false;
+              stopBtn.disabled = true;
+              playBtn.disabled = false;
+              downloadBtn.disabled = false;
+            });
+            countdownInterval = setInterval(() => {
+              countdownSeconds--;
+              if (countdownSeconds <= 0) {
+                clearInterval(countdownInterval);
+                mediaRecorder.stop();
+                countdownSeconds = 10;
+                countdown.textContent = '';
+              } else {
+                countdown.textContent = `Recording ends in ${countdownSeconds}s`;
+              }
+            }, 1000);
+          });
+      });
+
+      // Stop recording audio
+      stopBtn.addEventListener('click', () => {
+        mediaRecorder.stop();
+        clearInterval(countdownInterval);
+        countdownSeconds = 10;
+        countdown.textContent = '';
+      });
+
+      // Play recorded audio
+      playBtn.addEventListener('click', () => {
+        console.log(chunks);
+        audioPlayer.play();
+      });
+
+      // Download recorded audio
+      downloadBtn.addEventListener('click', () => {
+        const audioBlob = new Blob(chunks, { type: fileTypeSelect.value });
+        const url = URL.createObjectURL(audioBlob);
+        const a = document.createElement('a');
+        document.body.appendChild(a);
+        a.style = 'display: none';
+        a.href = url;
+        a.download = `recording.${fileTypeSelect.value.split('/')[1]}`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
+    </script>
+  </body>
+</html>
